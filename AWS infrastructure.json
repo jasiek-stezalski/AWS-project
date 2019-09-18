@@ -1,0 +1,181 @@
+{
+  "Parameters": {
+      "nexusImage" : {
+      "Description" : "Key Pair",
+      "Type" : "AWS::EC2::KeyPair::KeyName"
+    }
+  },
+  "Resources": {
+      "InternetGateway" : {
+         "Type" : "AWS::EC2::InternetGateway"
+      },
+      "NexusVPC" : {
+         "Type" : "AWS::EC2::VPC",
+         "Properties" : {
+            "CidrBlock" : "192.168.0.0/24",
+          "EnableDnsSupport" : "true",
+          "EnableDnsHostnames" : "true",
+            "InstanceTenancy" : "default",
+            "Tags" : [ {"Key" : "VPCName", "Value" : "Nexus"} ]
+         }
+      },
+      "RouteTable" : {
+         "Type" : "AWS::EC2::RouteTable",
+         "Properties" : {
+            "VpcId" : { "Ref" : "NexusVPC" },
+            "Tags" : [ { "Key" : "foo", "Value" : "bar" } ]
+         }
+      },
+      "SubnetRouteTableAssociation1" : {
+         "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+         "Properties" : {
+            "SubnetId" : { "Ref" : "subnet1" },
+            "RouteTableId" : { "Ref" : "RouteTable" }
+         }
+      },
+      "Route" : {
+         "Type" : "AWS::EC2::Route",
+         "DependsOn" : "InternetGateway",
+         "Properties" : {
+            "RouteTableId" : { "Ref" : "RouteTable" },
+            "DestinationCidrBlock" : "0.0.0.0/0",
+            "GatewayId" : { "Ref" : "InternetGateway" }
+         }
+      },
+      "SubnetRouteTableAssociation2" : {
+         "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+         "Properties" : {
+            "SubnetId" : { "Ref" : "subnet2" },
+            "RouteTableId" : { "Ref" : "RouteTable" }
+         }
+      },
+      "AttachGateway" : {
+          "Type" : "AWS::EC2::VPCGatewayAttachment",
+          "Properties" : {
+          "VpcId" : { "Ref" : "NexusVPC" },
+          "InternetGatewayId" : { "Ref" : "InternetGateway" }
+         }
+      },
+      "subnet1" : {
+         "Type" : "AWS::EC2::Subnet",
+         "Properties" : {
+            "VpcId" : { "Ref" : "NexusVPC" },
+            "CidrBlock" : "192.168.0.0/25",
+            "AvailabilityZone" : "eu-central-1a",
+            "MapPublicIpOnLaunch" : true,
+            "Tags" : [ {"Key" : "SubnetName", "Value" : "Nexus"} ]
+         }
+      },
+      "subnet2" : {
+         "Type" : "AWS::EC2::Subnet",
+         "Properties" : {
+            "VpcId" : { "Ref" : "NexusVPC" },
+            "CidrBlock" : "192.168.0.128/25",
+            "AvailabilityZone" : "eu-central-1b",
+            "MapPublicIpOnLaunch" : true,
+            "Tags" : [ {"Key" : "SubnetName", "Value" : "Nexus"} ]
+         }
+      },
+    "SecurityGroupELB": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "DependsOn": "NexusVPC",
+      "Properties": {
+        "GroupDescription": "Security group",
+     "VpcId" : {"Ref" : "NexusVPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 22,
+            "ToPort": 22
+          },
+          {
+            "IpProtocol": "tcp",
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 8081,
+            "ToPort": 8081
+           }
+         ]
+      }
+    },
+    "SecurityGroupEC2": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "DependsOn": "NexusVPC",
+      "Properties": {
+        "GroupDescription": "Security group",
+     "VpcId" : {"Ref" : "NexusVPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 22,
+            "ToPort": 22
+          },
+          {
+            "IpProtocol": "tcp",
+            "SourceSecurityGroupId": {"Ref" : "SecurityGroupELB"},
+            "FromPort": 8081,
+            "ToPort": 8081
+           }
+         ]
+      }
+    },
+    "AutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "AvailabilityZones": ["eu-central-1a", "eu-central-1b"],
+        "LaunchConfigurationName": { "Ref": "LaunchConfig" },
+        "HealthCheckType": "ELB",
+        "HealthCheckGracePeriod": "60",
+        "DesiredCapacity": "2",
+        "MinSize": "2",
+        "MaxSize": "2",
+        "VPCZoneIdentifier": [
+          { "Ref": "subnet1" }, { "Ref": "subnet2" }
+        ],
+        "LoadBalancerNames" : [ { "Ref" : "ElasticLoadBalancer" } ]
+      }
+    },
+    "ElasticLoadBalancer" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "Subnets" : [{ "Ref" : "subnet1" }, { "Ref" : "subnet2" }],
+        "CrossZone" : "true",
+        "SecurityGroups" : [ { "Ref": "SecurityGroupELB" }],
+        "Listeners" : [ {
+          "LoadBalancerPort" : "8081",
+          "InstancePort" : "8081",
+          "Protocol" : "TCP"
+        } ]
+      }
+    },
+
+    "LaunchConfig": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "KeyName" : { "Ref" : "nexusImage"},
+        "ImageId": "ami-00d6a392d1f123e87",
+        "SecurityGroups" : [{ "Ref": "SecurityGroupEC2" }],
+        "InstanceType": "t2.micro",
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join" : [ "", [
+              "#!/bin/bash -xe\n",
+              "ansible-playbook nexus.yaml\n"
+            ] ]
+          }
+        }
+      }
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+
