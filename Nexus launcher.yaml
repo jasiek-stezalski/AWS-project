@@ -1,0 +1,67 @@
+- name: Nexus launcher
+  hosts: localhost
+  connection: local
+  sudo: yes
+  tasks:
+
+    - name: Install java
+      shell: yum install java-1.8.0-openjdk -y
+
+    - name: Download nexus_package
+      get_url:
+        url: https://sonatype-download.global.ssl.fastly.net/nexus/3/nexus-3.0.2-02-unix.tar.gz
+        dest: /opt/nexus-3.0.2-02-unix.tar.gz
+      tags: download
+
+    - name: Unpack Nexus download
+      unarchive:
+        src: /opt/nexus-3.0.2-02-unix.tar.gz
+        dest: /opt/
+        creates: /opt/nexus-3.0.2-02
+      tags: unpack
+
+    - name: move repo files out of the way
+      shell: mv /opt/nexus-3.0.2-02/ /opt/nexus/
+
+    - name: Create user nexus
+      user:
+        name: nexus
+
+    - name: Configure user nexus permissions
+      lineinfile:
+        path: /etc/sudoers
+        line: 'nexus   ALL=(ALL)       NOPASSWD: ALL'
+
+    - name: Add permission to nexus
+      shell: chown -R nexus:nexus /opt/nexus
+
+    - name: Configure run_as_user = nexus
+      lineinfile:
+        path: /opt/nexus/bin/nexus.rc
+        regexp: 'run_as_user=""'
+        line: 'run_as_user="nexus"'
+
+    - name: Check if /etc/init.d/nexus exists
+      stat:
+        path: /etc/init.d/nexus
+      register: stat_result
+
+    - name: Update symlink nexus-latest
+      shell: ln -s /opt/nexus/bin/nexus /etc/init.d/nexus
+      when: stat_result.stat.exists == false
+
+    - name: Start nexus service
+      service:
+        name: nexus
+        state: started
+
+    - name: Add nexus
+      shell: chkconfig --add nexus
+
+    - name: Autostart nexus
+      shell: chkconfig nexus on
+
+    - name: Start nexus service
+      service:
+        name: nexus
+        state: started
