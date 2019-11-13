@@ -154,7 +154,7 @@
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
         "KeyName" : { "Ref" : "nexusImage"},
-        "ImageId": "ami-06fd7b01a62801288",
+        "ImageId": "ami-09bd474a2433f7866",
         "SecurityGroups" : [{ "Ref": "SecurityGroupEC2" }],
         "InstanceType": "t2.micro",
         "UserData": {
