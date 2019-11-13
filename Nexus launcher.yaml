@@ -1,7 +1,7 @@
 - name: Nexus launcher
   hosts: localhost
   connection: local
-  sudo: yes
+  become: true
   tasks:
 
     - name: Install java
@@ -49,6 +49,11 @@
     - name: Update symlink nexus-latest
       shell: ln -s /opt/nexus/bin/nexus /etc/init.d/nexus
       when: stat_result.stat.exists == false
+
+    - name: allocate a new elastic IP without associating it to anything
+      ec2_eip:
+        state: present
+      register: eip
 
     - name: Start nexus service
       service:
