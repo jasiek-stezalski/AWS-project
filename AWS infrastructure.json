@@ -113,7 +113,7 @@
           },
           {
             "IpProtocol": "tcp",
-            "SourceSecurityGroupId": {"Ref" : "SecurityGroupELB"},
+            "CidrIp": "0.0.0.0/0",
             "FromPort": 8081,
             "ToPort": 8081
            }
@@ -154,7 +154,7 @@
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
         "KeyName" : { "Ref" : "nexusImage"},
-        "ImageId": "ami-09bd474a2433f7866",
+        "ImageId": "ami-06fd7b01a62801288",
         "SecurityGroups" : [{ "Ref": "SecurityGroupEC2" }],
         "InstanceType": "t2.micro",
         "UserData": {
@@ -169,13 +169,3 @@
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
