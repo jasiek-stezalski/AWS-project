@@ -113,7 +113,7 @@
           },
           {
             "IpProtocol": "tcp",
-            "CidrIp": "0.0.0.0/0",
+            "SourceSecurityGroupId": {"Ref" : "SecurityGroupELB"},
             "FromPort": 8081,
             "ToPort": 8081
            }
